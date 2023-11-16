@@ -1,16 +1,19 @@
-use bevy::{math::*, prelude::*, sprite::MaterialMesh2dBundle, window::PrimaryWindow};
-use std::f32::consts::PI;
+mod debug;
 
-const SHIP_VELOCITY: f32 = 256.;
-const SHIP_ROTATION_VELOCITY: f32 = 8.;
+use bevy::{math::*, prelude::*};
+use debug::DebugPlugin;
+
+const SHIP_VELOCITY: f32 = 48.;
+const SHIP_ROTATION_VELOCITY: f32 = 6.;
+const MAIN_CAMERA_TRANSFORM_OFFSET: Vec3 = Vec3::new(0., 70., -70.);
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, bevy_framepace::FramepacePlugin))
+        .add_plugins((DefaultPlugins, bevy_framepace::FramepacePlugin, DebugPlugin))
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
         .insert_resource(AmbientLight {
             color: Color::WHITE,
-            brightness: 0.6,
+            brightness: 0.4,
         })
         .add_systems(Startup, setup)
         .add_systems(
@@ -28,24 +31,42 @@ fn main() {
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
     // camera
-    commands.spawn((Camera2dBundle::default(), MainCamera));
+    commands.spawn((
+        MainCamera,
+        Camera3dBundle {
+            transform: Transform::from_translation(MAIN_CAMERA_TRANSFORM_OFFSET)
+                .looking_at(Vec3::ZERO, Vec3::Z),
+            camera: Camera { ..default() },
+            ..default()
+        },
+    ));
+
+    // scene lighting
+    commands.spawn(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+            color: Color::WHITE,
+            illuminance: 1024.,
+            ..default()
+        },
+        ..default()
+    });
 
     commands.init_resource::<CursorPosition>();
 
     // position marker
     commands.spawn((
         PositionMarker,
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgb(0., 0.5, 0.),
-                custom_size: Some(vec2(16., 16.)),
+        PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Cube {
+                size: 2.,
                 ..default()
-            },
-            texture: asset_server.load("crosshair.png"),
+            })),
+            material: materials.add(Color::rgba(0., 0.5, 1., 0.1).into()),
+            // transform: Transform::from_xyz(0.0, 0.5, 0.0),
             ..default()
         },
     ));
@@ -53,24 +74,23 @@ fn setup(
     // ship
     commands.spawn((
         Ship,
-        MaterialMesh2dBundle {
-            mesh: meshes.add(shape::RegularPolygon::new(16., 3).into()).into(),
-            material: materials.add(ColorMaterial::from(Color::rgb(0., 0.1, 0.8))),
-            transform: Transform {
-                scale: vec3(1., 1.5, 1.),
-                ..default()
-            },
+        SceneBundle {
+            scene: asset_server.load("spaceship_beta.glb#Scene0"),
+            transform: Transform::from_translation(vec3(0.0, 0.0, 0.0)),
             ..default()
         },
     ));
 
     // origin marker
-    commands.spawn(MaterialMesh2dBundle {
-        mesh: meshes.add(shape::Circle::new(2.).into()).into(),
-        material: materials.add(ColorMaterial::from(Color::WHITE)),
-        transform: Transform::from_translation(vec3(0., 0., 999.)),
+    commands.spawn((PbrBundle {
+        mesh: meshes.add(Mesh::from(shape::UVSphere {
+            radius: 4.,
+            ..default()
+        })),
+        material: materials.add(Color::rgba(1., 1., 1., 0.1).into()),
+        transform: Transform::from_xyz(0.0, 0.5, 0.0),
         ..default()
-    });
+    },));
 }
 
 /// Marks the position where the ship should go
@@ -84,27 +104,33 @@ struct MainCamera;
 #[derive(Component)]
 struct Ship;
 
-#[derive(Component, Deref, DerefMut)]
-struct Velocity(Vec2);
-
 #[derive(Resource, Default)]
-struct CursorPosition(Vec2);
+struct CursorPosition(Vec3);
 
 fn update_cursor_position(
-    mut cursor_position: ResMut<CursorPosition>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
+    windows: Query<&Window>,
+    mut gizmos: Gizmos,
+    mut cursor_position_resource: ResMut<CursorPosition>,
 ) {
     let (camera, camera_transform) = camera_query.single();
-    let window = window_query.single();
+    let plane = Transform::from_xyz(0., 0., 0.);
 
-    if let Some(world_position) = window
-        .cursor_position()
-        .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
-        .map(|ray| ray.origin.truncate())
-    {
-        cursor_position.0 = world_position;
-    }
+    let Some(cursor_position) = windows.single().cursor_position() else {
+        return;
+    };
+
+    let Some(ray) = camera.viewport_to_world(camera_transform, cursor_position) else {
+        return;
+    };
+
+    let Some(distance) = ray.intersect_plane(plane.translation, plane.up()) else {
+        return;
+    };
+    let point = ray.get_point(distance);
+
+    gizmos.circle(point + plane.up() * 0.01, plane.up(), 0.8, Color::WHITE);
+    cursor_position_resource.0 = point + plane.up() * 0.01;
 }
 
 fn update_marker_position(
@@ -114,8 +140,8 @@ fn update_marker_position(
 ) {
     let mut transform = marker_query.single_mut();
 
-    for _ in mouse_input.get_pressed() {
-        transform.translation = cursor_position_query.0.extend(0.);
+    if mouse_input.pressed(MouseButton::Left) {
+        transform.translation = cursor_position_query.0;
     }
 }
 
@@ -131,9 +157,9 @@ fn move_ship(
     let distance = direction.length();
 
     if distance >= 0.5 {
-        let target_rotation = (direction.y).atan2(direction.x) - PI * 0.5;
+        let target_rotation = (direction.x).atan2(direction.z);
         ship_transform.rotation = ship_transform.rotation.slerp(
-            Quat::from_rotation_z(target_rotation),
+            Quat::from_rotation_y(target_rotation),
             time.delta_seconds() * SHIP_ROTATION_VELOCITY,
         );
 
@@ -158,6 +184,9 @@ fn lock_camera_to_ship(
     }
 
     for mut camera in param_query.p1().iter_mut() {
-        camera.translation = ship_translation;
+        camera.translation =
+            Transform::from_translation(ship_translation + MAIN_CAMERA_TRANSFORM_OFFSET)
+                .looking_at(ship_translation, Vec3::Z)
+                .translation;
     }
 }
