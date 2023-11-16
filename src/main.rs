@@ -1,10 +1,14 @@
 mod debug;
 
+use std::f32::consts::PI;
+
 use bevy::{math::*, prelude::*};
 use debug::DebugPlugin;
 
 const SHIP_VELOCITY: f32 = 48.;
 const SHIP_ROTATION_VELOCITY: f32 = 6.;
+const SHIP_MAX_TILT_ANGLE: f32 = PI * 0.15;
+// const SHIP_TILT_VELOCITY: f32 = PI * 2.;
 const MAIN_CAMERA_TRANSFORM_OFFSET: Vec3 = Vec3::new(0., 70., -70.);
 
 fn main() {
@@ -72,14 +76,14 @@ fn setup(
     ));
 
     // ship
-    commands.spawn((
-        Ship,
-        SceneBundle {
+    commands.spawn(ShipBundle {
+        ship: Ship::default(),
+        scene_bundle: SceneBundle {
             scene: asset_server.load("spaceship_beta.glb#Scene0"),
             transform: Transform::from_translation(vec3(0.0, 0.0, 0.0)),
             ..default()
         },
-    ));
+    });
 
     // origin marker
     commands.spawn((PbrBundle {
@@ -101,8 +105,16 @@ struct PositionMarker;
 #[derive(Component)]
 struct MainCamera;
 
-#[derive(Component)]
-struct Ship;
+#[derive(Component, Default, Debug)]
+struct Ship {
+    previous_tilt_angle: f32,
+}
+
+#[derive(Bundle)]
+struct ShipBundle {
+    ship: Ship,
+    scene_bundle: SceneBundle,
+}
 
 #[derive(Resource, Default)]
 struct CursorPosition(Vec3);
@@ -145,30 +157,93 @@ fn update_marker_position(
     }
 }
 
+#[derive(Debug)]
+enum Tilt {
+    Horizontal,
+    Left,
+    Right,
+}
+
 fn move_ship(
-    mut ship_query: Query<&mut Transform, With<Ship>>,
+    mut ship_query: Query<(&mut Transform, &mut Ship)>,
     position_query: Query<&Transform, (With<PositionMarker>, Without<Ship>)>,
     time: Res<Time>,
 ) {
-    let mut ship_transform = ship_query.single_mut();
+    let (mut ship_transform, mut ship) = ship_query.single_mut();
     let position_marker = position_query.single();
 
+    // compare between only x and z
     let direction = position_marker.translation - ship_transform.translation;
-    let distance = direction.length();
+    let distance = direction.length_squared();
+
+    // println!(
+    //     "{}, {}",
+    //     position_marker.translation, ship_transform.translation
+    // );
+    // println!("{:?}", ship_transform.rotation.to_euler(EulerRot::XYZ));
 
     if distance >= 0.5 {
         let target_rotation = (direction.x).atan2(direction.z);
+
+        let positive_new_tilt_angle = angle_to_positive_domain(target_rotation);
+        let positive_previous_tilt_angle = angle_to_positive_domain(ship.previous_tilt_angle);
+        let tilt_direction: Tilt;
+        let tilt_difference = positive_new_tilt_angle - positive_previous_tilt_angle;
+        let tilt_factor: f32;
+
+        if tilt_difference.abs() < 0.01 {
+            tilt_direction = Tilt::Horizontal;
+        } else if tilt_difference > 0. {
+            tilt_direction = Tilt::Right;
+        } else {
+            tilt_direction = Tilt::Left;
+        }
+
+        match tilt_direction {
+            Tilt::Left => tilt_factor = 1.,
+            Tilt::Right => tilt_factor = -1.,
+            Tilt::Horizontal => tilt_factor = 0.,
+        }
+
+        println!("{:?}", tilt_direction);
+
         ship_transform.rotation = ship_transform.rotation.slerp(
-            Quat::from_rotation_y(target_rotation),
+            Quat::from_euler(
+                EulerRot::XYZ,
+                0.,
+                target_rotation,
+                tilt_factor * SHIP_MAX_TILT_ANGLE,
+            ),
             time.delta_seconds() * SHIP_ROTATION_VELOCITY,
         );
 
+        // let new_tilt_angle = target_rotation;
+        // println!(
+        //     "{}, {}",
+        //     new_tilt_angle.abs(),
+        //     ship.previous_tilt_angle.abs()
+        // );
+        ship.previous_tilt_angle = target_rotation;
+
+        // println!(
+        //     "rotation {:?}",
+        //     angle_to_positive_domain(target_rotation) * 180. / PI // ship_transform.rotation.to_euler(EulerRot::XYZ).2 * 180. / PI
+        // );
+
         let step_magnitude = SHIP_VELOCITY * time.delta_seconds();
-        if step_magnitude > distance {
+        if step_magnitude.powi(2) > distance {
             ship_transform.translation = position_marker.translation;
         } else {
             ship_transform.translation += direction.normalize() * step_magnitude;
         }
+    }
+}
+
+fn angle_to_positive_domain(angle: f32) -> f32 {
+    if angle >= 0. {
+        angle
+    } else {
+        2. * PI - angle.abs()
     }
 }
 
