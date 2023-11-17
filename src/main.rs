@@ -27,6 +27,7 @@ fn main() {
                 update_marker_position,
                 move_ship,
                 lock_camera_to_ship.after(move_ship),
+                draw_gizmos,
             ),
         )
         .run();
@@ -84,17 +85,6 @@ fn setup(
             ..default()
         },
     });
-
-    // origin marker
-    commands.spawn((PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::UVSphere {
-            radius: 4.,
-            ..default()
-        })),
-        material: materials.add(Color::rgba(1., 1., 1., 0.1).into()),
-        transform: Transform::from_xyz(0.0, 0.5, 0.0),
-        ..default()
-    },));
 }
 
 /// Marks the position where the ship should go
@@ -153,13 +143,6 @@ fn update_marker_position(
     if mouse_input.pressed(MouseButton::Left) {
         transform.translation = cursor_position_query.0;
     }
-}
-
-#[derive(Debug)]
-enum Tilt {
-    Horizontal,
-    Left,
-    Right,
 }
 
 fn move_ship(
@@ -229,4 +212,8 @@ fn lock_camera_to_ship(
                 .looking_at(ship_translation, Vec3::Z)
                 .translation;
     }
+}
+
+fn draw_gizmos(mut gizmos: Gizmos) {
+    gizmos.circle(Vec3::ZERO, Vec3::Y, 4., Color::WHITE);
 }
