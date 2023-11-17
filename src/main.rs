@@ -14,10 +14,11 @@ const MAIN_CAMERA_TRANSFORM_OFFSET: Vec3 = Vec3::new(0., 70., -70.);
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins, bevy_framepace::FramepacePlugin, DebugPlugin))
+        .insert_resource(Msaa::default())
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
         .insert_resource(AmbientLight {
             color: Color::WHITE,
-            brightness: 0.4,
+            brightness: 0.2,
         })
         .add_systems(Startup, setup)
         .add_systems(
@@ -54,7 +55,11 @@ fn setup(
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
             color: Color::WHITE,
-            illuminance: 1024.,
+            illuminance: 16384.,
+            ..default()
+        },
+        transform: Transform {
+            rotation: Quat::from_scaled_axis(vec3(0., 1., 0.8)),
             ..default()
         },
         ..default()
@@ -164,7 +169,7 @@ fn move_ship(
         let positive_previous_tilt_angle = angle_to_positive_domain(ship.previous_rotation_angle);
         let tilt_difference = positive_new_tilt_angle - positive_previous_tilt_angle;
 
-        println!("{:?}", tilt_difference);
+        // println!("{:?}", tilt_difference);
 
         ship_transform.rotation = ship_transform.rotation.slerp(
             Quat::from_euler(
