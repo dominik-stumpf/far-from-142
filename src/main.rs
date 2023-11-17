@@ -8,7 +8,7 @@ use debug::DebugPlugin;
 const SHIP_VELOCITY: f32 = 48.;
 const SHIP_ROTATION_VELOCITY: f32 = 6.;
 const SHIP_MAX_TILT_ANGLE: f32 = PI * 0.15;
-// const SHIP_TILT_VELOCITY: f32 = PI * 2.;
+// const SHIP_TILT_VELOCITY: f32 = 2.;
 const MAIN_CAMERA_TRANSFORM_OFFSET: Vec3 = Vec3::new(0., 70., -70.);
 
 fn main() {
@@ -122,7 +122,6 @@ struct CursorPosition(Vec3);
 fn update_cursor_position(
     camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     windows: Query<&Window>,
-    mut gizmos: Gizmos,
     mut cursor_position_resource: ResMut<CursorPosition>,
 ) {
     let (camera, camera_transform) = camera_query.single();
@@ -141,7 +140,6 @@ fn update_cursor_position(
     };
     let point = ray.get_point(distance);
 
-    gizmos.circle(point + plane.up() * 0.01, plane.up(), 0.8, Color::WHITE);
     cursor_position_resource.0 = point + plane.up() * 0.01;
 }
 
@@ -175,12 +173,6 @@ fn move_ship(
     // compare between only x and z
     let direction = position_marker.translation - ship_transform.translation;
     let distance = direction.length_squared();
-
-    // println!(
-    //     "{}, {}",
-    //     position_marker.translation, ship_transform.translation
-    // );
-    // println!("{:?}", ship_transform.rotation.to_euler(EulerRot::XYZ));
 
     if distance >= 0.5 {
         let target_rotation = (direction.x).atan2(direction.z);
