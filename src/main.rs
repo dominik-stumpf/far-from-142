@@ -7,7 +7,7 @@ use debug::DebugPlugin;
 
 const SHIP_VELOCITY: f32 = 48.;
 const SHIP_ROTATION_VELOCITY: f32 = 6.;
-const SHIP_MAX_TILT_ANGLE: f32 = PI * 0.15;
+const SHIP_MAX_TILT_ANGLE: f32 = PI * 0.16;
 // const SHIP_TILT_VELOCITY: f32 = 2.;
 const MAIN_CAMERA_TRANSFORM_OFFSET: Vec3 = Vec3::new(0., 70., -70.);
 
@@ -107,7 +107,7 @@ struct MainCamera;
 
 #[derive(Component, Default, Debug)]
 struct Ship {
-    previous_tilt_angle: f32,
+    previous_rotation_angle: f32,
 }
 
 #[derive(Bundle)]
@@ -178,49 +178,22 @@ fn move_ship(
         let target_rotation = (direction.x).atan2(direction.z);
 
         let positive_new_tilt_angle = angle_to_positive_domain(target_rotation);
-        let positive_previous_tilt_angle = angle_to_positive_domain(ship.previous_tilt_angle);
-        let tilt_direction: Tilt;
+        let positive_previous_tilt_angle = angle_to_positive_domain(ship.previous_rotation_angle);
         let tilt_difference = positive_new_tilt_angle - positive_previous_tilt_angle;
-        let tilt_factor: f32;
 
-        if tilt_difference.abs() < 0.01 {
-            tilt_direction = Tilt::Horizontal;
-        } else if tilt_difference > 0. {
-            tilt_direction = Tilt::Right;
-        } else {
-            tilt_direction = Tilt::Left;
-        }
-
-        match tilt_direction {
-            Tilt::Left => tilt_factor = 1.,
-            Tilt::Right => tilt_factor = -1.,
-            Tilt::Horizontal => tilt_factor = 0.,
-        }
-
-        println!("{:?}", tilt_direction);
+        println!("{:?}", tilt_difference);
 
         ship_transform.rotation = ship_transform.rotation.slerp(
             Quat::from_euler(
                 EulerRot::XYZ,
                 0.,
                 target_rotation,
-                tilt_factor * SHIP_MAX_TILT_ANGLE,
+                (tilt_difference * -6.).clamp(-SHIP_MAX_TILT_ANGLE, SHIP_MAX_TILT_ANGLE),
             ),
             time.delta_seconds() * SHIP_ROTATION_VELOCITY,
         );
 
-        // let new_tilt_angle = target_rotation;
-        // println!(
-        //     "{}, {}",
-        //     new_tilt_angle.abs(),
-        //     ship.previous_tilt_angle.abs()
-        // );
-        ship.previous_tilt_angle = target_rotation;
-
-        // println!(
-        //     "rotation {:?}",
-        //     angle_to_positive_domain(target_rotation) * 180. / PI // ship_transform.rotation.to_euler(EulerRot::XYZ).2 * 180. / PI
-        // );
+        ship.previous_rotation_angle = target_rotation;
 
         let step_magnitude = SHIP_VELOCITY * time.delta_seconds();
         if step_magnitude.powi(2) > distance {
