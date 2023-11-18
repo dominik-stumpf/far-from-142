@@ -90,7 +90,7 @@ fn setup(
     ));
 
     // ship
-    commands.spawn(ShipBundle {
+    let mut ship = commands.spawn(ShipBundle {
         ship: Ship::default(),
         scene_bundle: SceneBundle {
             scene: asset_server.load("spaceship_beta.glb#Scene0"),
@@ -101,22 +101,22 @@ fn setup(
 
     // setup particle emitter
     let mut gradient = Gradient::new();
-    gradient.add_key(0.0, Vec4::new(0.5, 0.5, 1.0, 1.0));
-    gradient.add_key(1.0, Vec4::new(0.5, 0.5, 1.0, 0.0));
+    gradient.add_key(0.0, Vec4::new(0.1, 0.1, 1.0, 1.0));
+    gradient.add_key(1.0, Vec4::new(0.4, 0.4, 0.6, 0.0));
 
-    let spawner = Spawner::rate(1024.0.into()).with_starts_active(true);
+    let spawner = Spawner::rate(512.0.into()).with_starts_active(true);
 
     let writer = ExprWriter::new();
 
     let age = writer.lit(0.).expr();
     let init_age = SetAttributeModifier::new(Attribute::AGE, age);
 
-    let lifetime = writer.lit(0.1).uniform(writer.lit(8.0)).expr();
+    let lifetime = writer.lit(0.1).uniform(writer.lit(0.4)).expr();
     let init_lifetime = SetAttributeModifier::new(Attribute::LIFETIME, lifetime);
 
     let init_pos = SetPositionSphereModifier {
         center: writer.lit(Vec3::ZERO).expr(),
-        radius: writer.lit(0.08).expr(),
+        radius: writer.lit(0.4).expr(),
         dimension: ShapeDimension::Volume,
     };
     // let init_pos = SetPositionCone3dModifier {
@@ -139,25 +139,32 @@ fn setup(
             .init(init_age)
             .init(init_lifetime)
             .render(SizeOverLifetimeModifier {
-                gradient: Gradient::constant(Vec2::splat(0.2)),
+                gradient: Gradient::constant(Vec2::splat(0.4)),
                 screen_space_size: false,
             })
             .render(ColorOverLifetimeModifier { gradient }),
     );
 
-    commands.spawn((
-        Name::new("trail"),
-        ParticleEffectBundle {
-            effect: ParticleEffect::new(effect),
-            transform: Transform::IDENTITY,
-            ..Default::default()
-        },
-    ));
+    // commands.spawn((
+    //     Name::new("trail"),
+    //     ParticleEffectBundle {
+    //         effect: ParticleEffect::new(effect),
+    //         transform: Transform::IDENTITY,
+    //         ..Default::default()
+    //     },
+    // ));
 
-    // ship.with_children(|node| {
-    //     node.spawn(ParticleEffectBundle::new(effect).with_spawner(spawner))
-    //         .insert(Name::new("effect"));
-    // });
+    ship.with_children(|node| {
+        node.spawn(
+            ParticleEffectBundle {
+                effect: ParticleEffect::new(effect),
+                transform: Transform::from_xyz(0., 0., -4.),
+                ..default()
+            }
+            .with_spawner(spawner),
+        )
+        .insert(Name::new("effect"));
+    });
 }
 
 /// Marks the position where the ship should go
@@ -244,7 +251,7 @@ fn move_ship(
                 EulerRot::XYZ,
                 0.,
                 target_rotation,
-                (tilt_difference * -6.).clamp(-SHIP_MAX_TILT_ANGLE, SHIP_MAX_TILT_ANGLE),
+                0., // (tilt_difference * -6.).clamp(-SHIP_MAX_TILT_ANGLE, SHIP_MAX_TILT_ANGLE),
             ),
             time.delta_seconds() * SHIP_ROTATION_VELOCITY,
         );
@@ -298,8 +305,8 @@ fn emit(
 ) {
     // let (mut ship, mut transform, children) = ship_query.single_mut();
     let (mut transform, mut effect) = spawner_query.single_mut();
-    transform.translation.x += 8. * time.delta_seconds();
-    transform.translation.y = transform.translation.x.sin();
+    // transform.translation.x += 8. * time.delta_seconds();
+    // transform.translation.y = transform.translation.x.sin();
     // transform.translation = Vec3::splat(time.elapsed_seconds().sin() * 16.);
 
     // spawner.set_active(true);
