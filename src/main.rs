@@ -3,6 +3,7 @@ mod debug;
 use std::f32::consts::PI;
 
 use bevy::{math::*, prelude::*};
+use bevy_hanabi::prelude::*;
 use debug::DebugPlugin;
 
 const SHIP_VELOCITY: f32 = 48.;
@@ -13,7 +14,12 @@ const MAIN_CAMERA_TRANSFORM_OFFSET: Vec3 = Vec3::new(0., 70., -70.);
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, bevy_framepace::FramepacePlugin, DebugPlugin))
+        .add_plugins((
+            DefaultPlugins,
+            bevy_framepace::FramepacePlugin,
+            DebugPlugin,
+            HanabiPlugin,
+        ))
         .insert_resource(Msaa::default())
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
         .insert_resource(AmbientLight {
@@ -29,6 +35,7 @@ fn main() {
                 move_ship,
                 lock_camera_to_ship.after(move_ship),
                 draw_gizmos,
+                emit,
             ),
         )
         .run();
@@ -38,6 +45,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut effects: ResMut<Assets<EffectAsset>>,
     asset_server: Res<AssetServer>,
 ) {
     // camera
@@ -90,6 +98,66 @@ fn setup(
             ..default()
         },
     });
+
+    // setup particle emitter
+    let mut gradient = Gradient::new();
+    gradient.add_key(0.0, Vec4::new(0.5, 0.5, 1.0, 1.0));
+    gradient.add_key(1.0, Vec4::new(0.5, 0.5, 1.0, 0.0));
+
+    let spawner = Spawner::rate(1024.0.into()).with_starts_active(true);
+
+    let writer = ExprWriter::new();
+
+    let age = writer.lit(0.).expr();
+    let init_age = SetAttributeModifier::new(Attribute::AGE, age);
+
+    let lifetime = writer.lit(0.1).uniform(writer.lit(8.0)).expr();
+    let init_lifetime = SetAttributeModifier::new(Attribute::LIFETIME, lifetime);
+
+    let init_pos = SetPositionSphereModifier {
+        center: writer.lit(Vec3::ZERO).expr(),
+        radius: writer.lit(0.08).expr(),
+        dimension: ShapeDimension::Volume,
+    };
+    // let init_pos = SetPositionCone3dModifier {
+    //     base_radius: writer.lit(0.).expr(),
+    //     top_radius: writer.lit(0.8).expr(),
+    //     height: writer.lit(8.).expr(),
+    //     dimension: ShapeDimension::Volume,
+    // };
+
+    let init_vel = SetVelocitySphereModifier {
+        center: writer.lit(Vec3::ZERO).expr(),
+        speed: writer.lit(0.0).expr(),
+    };
+
+    let effect = effects.add(
+        EffectAsset::new(32768, spawner, writer.finish())
+            .with_name("activate")
+            .init(init_pos)
+            .init(init_vel)
+            .init(init_age)
+            .init(init_lifetime)
+            .render(SizeOverLifetimeModifier {
+                gradient: Gradient::constant(Vec2::splat(0.2)),
+                screen_space_size: false,
+            })
+            .render(ColorOverLifetimeModifier { gradient }),
+    );
+
+    commands.spawn((
+        Name::new("trail"),
+        ParticleEffectBundle {
+            effect: ParticleEffect::new(effect),
+            transform: Transform::IDENTITY,
+            ..Default::default()
+        },
+    ));
+
+    // ship.with_children(|node| {
+    //     node.spawn(ParticleEffectBundle::new(effect).with_spawner(spawner))
+    //         .insert(Name::new("effect"));
+    // });
 }
 
 /// Marks the position where the ship should go
@@ -221,4 +289,18 @@ fn lock_camera_to_ship(
 
 fn draw_gizmos(mut gizmos: Gizmos) {
     gizmos.circle(Vec3::ZERO, Vec3::Y, 4., Color::WHITE);
+}
+
+fn emit(
+    // mut ship_query: Query<(&mut Ship, &mut Transform, &Children)>,
+    mut spawner_query: Query<(&mut Transform, &mut ParticleEffect)>,
+    time: Res<Time>,
+) {
+    // let (mut ship, mut transform, children) = ship_query.single_mut();
+    let (mut transform, mut effect) = spawner_query.single_mut();
+    transform.translation.x += 8. * time.delta_seconds();
+    transform.translation.y = transform.translation.x.sin();
+    // transform.translation = Vec3::splat(time.elapsed_seconds().sin() * 16.);
+
+    // spawner.set_active(true);
 }
