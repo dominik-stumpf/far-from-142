@@ -8,7 +8,9 @@ edition = "2021"
 [dependencies]
 bevy = { version = "0.12.0", features = ["dynamic_linking"] }
 bevy_framepace = "0.14.1"
-bevy_hanabi = "0.8.0"
+# bevy_hanabi = "0.8.0"
+# contains fix for assert fail: https://github.com/djeedai/bevy_hanabi/pull/253
+bevy_hanabi = { git = "https://github.com/djeedai/bevy_hanabi.git", rev = "a3cf8ed050e8c5517d5dd68554c7c79d5680e1f3" }
 bevy_mod_picking = "0.17.0"
 
 # Enable a small amount of optimization in debug mode

@@ -251,7 +251,7 @@ fn move_ship(
                 EulerRot::XYZ,
                 0.,
                 target_rotation,
-                0., // (tilt_difference * -6.).clamp(-SHIP_MAX_TILT_ANGLE, SHIP_MAX_TILT_ANGLE),
+                (tilt_difference * -6.).clamp(-SHIP_MAX_TILT_ANGLE, SHIP_MAX_TILT_ANGLE),
             ),
             time.delta_seconds() * SHIP_ROTATION_VELOCITY,
         );
@@ -305,6 +305,7 @@ fn emit(
 ) {
     // let (mut ship, mut transform, children) = ship_query.single_mut();
     let (mut transform, mut effect) = spawner_query.single_mut();
+    // transform.rotation = Quat::IDENTITY;
     // transform.translation.x += 8. * time.delta_seconds();
     // transform.translation.y = transform.translation.x.sin();
     // transform.translation = Vec3::splat(time.elapsed_seconds().sin() * 16.);
