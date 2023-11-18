@@ -119,12 +119,6 @@ fn setup(
         radius: writer.lit(0.4).expr(),
         dimension: ShapeDimension::Volume,
     };
-    // let init_pos = SetPositionCone3dModifier {
-    //     base_radius: writer.lit(0.).expr(),
-    //     top_radius: writer.lit(0.8).expr(),
-    //     height: writer.lit(8.).expr(),
-    //     dimension: ShapeDimension::Volume,
-    // };
 
     let init_vel = SetVelocitySphereModifier {
         center: writer.lit(Vec3::ZERO).expr(),
