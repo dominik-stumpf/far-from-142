@@ -1,10 +1,11 @@
 mod debug;
-
-use std::f32::consts::PI;
+mod setup;
 
 use bevy::{math::*, prelude::*};
 use bevy_hanabi::prelude::*;
 use debug::DebugPlugin;
+use setup::SetupPlugin;
+use std::f32::consts::PI;
 
 const SHIP_VELOCITY: f32 = 48.;
 const SHIP_ROTATION_VELOCITY: f32 = 6.;
@@ -19,6 +20,7 @@ fn main() {
             bevy_framepace::FramepacePlugin,
             DebugPlugin,
             HanabiPlugin,
+            SetupPlugin,
         ))
         .insert_resource(Msaa::default())
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
@@ -305,4 +307,12 @@ fn emit(
     // transform.translation = Vec3::splat(time.elapsed_seconds().sin() * 16.);
 
     // spawner.set_active(true);
+}
+
+#[derive(States, Default, Debug, Clone, Hash, Eq, PartialEq)]
+pub enum GameState {
+    #[default]
+    MainMenu,
+    InGame,
+    Paused,
 }

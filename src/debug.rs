@@ -2,6 +2,7 @@ use bevy::{
     diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     prelude::*,
 };
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 pub struct DebugPlugin;
 
@@ -21,9 +22,9 @@ impl Plugin for DebugPlugin {
                 TimerMode::Repeating,
             )))
             .add_systems(Update, text_update_system)
-            .add_plugins(FrameTimeDiagnosticsPlugin);
-    }
-}
+            .add_plugins((FrameTimeDiagnosticsPlugin,  WorldInspectorPlugin::new()));
+    } 
+} 
 fn setup(mut commands: Commands) {
     // fps debug
     commands.spawn((
